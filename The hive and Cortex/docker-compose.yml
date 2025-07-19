@@ -1,0 +1,56 @@
+version: "3.7"
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.18
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - cluster.name=hive
+      - bootstrap.memory_lock=true
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - hive
+
+  cortex:
+    image: thehiveproject/cortex:3.1.1
+    ports:
+      - "9001:9001"
+    environment:
+      - jobDirectory=/tmp/cortex-jobs
+      - cortex.external-url=http://localhost:9001
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/cortex-jobs:/tmp/cortex-jobs
+    depends_on:
+      - elasticsearch
+    networks:
+      - hive
+
+  thehive:
+    image: strangebee/thehive:5.2
+    ports:
+      - "9000:9000"
+    environment:
+      - THEHIVE_elasticsearch.hosts=["http://elasticsearch:9200"]
+      - THEHIVE_cortex.cortex-1.url=http://cortex:9001
+      - THEHIVE_cortex.cortex-1.name=Cortex
+    depends_on:
+      - elasticsearch
+      - cortex
+    networks:
+      - hive
+
+volumes:
+  esdata:
+  cortex-data:
+
+networks:
+  hive:
+    driver: bridge
